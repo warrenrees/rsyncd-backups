@@ -3,7 +3,7 @@ name: Publish Docker image
 on:
   push:
     tags:
-      - 'v*'     # e.g., v0.1.5
+      - 'v*'     # e.g., v0.2.2
 
 jobs:
   docker:
@@ -33,10 +33,8 @@ jobs:
         with:
           images: warrenrees/rsyncd-backups
           tags: |
-            type=ref,event=tag
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=ref,event=tag           # v0.2.2 -> 0.2.2 (only full semver)
+            type=raw,value=latest        # also push :latest
           labels: |
             org.opencontainers.image.title=rsyncd-backups
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
