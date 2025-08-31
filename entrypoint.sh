@@ -4,7 +4,10 @@ set -e
 SECRETS="/var/lib/rsyncd/rsyncd.secrets"
 CONF_TMPL="/etc/rsyncd.conf.template"
 CONF_OUT="/var/lib/rsyncd/rsyncd.conf"
-LOGFILE="/var/lib/rsyncd/rsyncd.log"
+
+# Defaults for K8s friendliness
+RSYNC_PORT="${RSYNC_PORT:-873}"
+RSYNC_ADDR="${RSYNC_ADDR:-0.0.0.0}"
 
 # Build secrets from env
 if [ -n "${RSYNC_USERS:-}" ]; then
@@ -33,26 +36,33 @@ fi
 
 chmod 600 "$SECRETS"
 
-# Render config with resolved user list
-sed "s/\${RSYNC_USER}/${RSYNC_USER}/g" "$CONF_TMPL" > "$CONF_OUT"
+# Render config
+sed -e "s/\${RSYNC_USER}/${RSYNC_USER}/g" \
+    -e "s/\${RSYNC_PORT}/${RSYNC_PORT}/g" \
+    -e "s/\${RSYNC_ADDR}/${RSYNC_ADDR}/g" \
+    "$CONF_TMPL" > "$CONF_OUT"
 
-# Ensure log file exists for tailing
-: > "$LOGFILE"
-
-# Startup logs
-echo "[entrypoint] Rsync daemon starting..."
-echo "[entrypoint] Users configured: $RSYNC_USER"
-echo "[entrypoint] Backups share path: /backups"
-echo "[entrypoint] Config file: $CONF_OUT"
-echo "[entrypoint] Log file: $LOGFILE"
-
-# Stream rsyncd log to stdout so `docker logs` shows ongoing activity
-# (background; rsync remains PID1 after exec)
-tail -F "$LOGFILE" &
-
-# IMPORTANT: Do NOT chown /backups here (non-root, and it may be a bind mount).
-# Ensure /backups exists; if it’s a bind mount, the host must grant UID 1000 write perms.
+# Preflight: ensure writable state dir and share exist
+mkdir -p /var/lib/rsyncd || true
 mkdir -p /backups || true
 
-# Launch rsyncd in foreground (non-detached) with our config
-exec rsync --daemon --no-detach --config="$CONF_OUT"
+# Write test in state dir (common K8s issue if wrong fsGroup/permissions)
+if ! sh -c "echo test > /var/lib/rsyncd/.writable"; then
+  echo "[entrypoint] ERROR: /var/lib/rsyncd is not writable by UID $(id -u). In K8s set fsGroup or fix volume perms." >&2
+  ls -ld /var/lib/rsyncd >&2 || true
+  id >&2 || true
+  exit 1
+fi
+rm -f /var/lib/rsyncd/.writable || true
+
+echo "[entrypoint] Container version: ${RSYNCD_VERSION:-unknown}"
+echo "[entrypoint] Rsync daemon starting"
+echo "[entrypoint] UID:GID $(id -u):$(id -g)"
+echo "[entrypoint] Users: ${RSYNC_USER}"
+echo "[entrypoint] Bind: ${RSYNC_ADDR}:${RSYNC_PORT}"
+echo "[entrypoint] State dir: /var/lib/rsyncd"
+echo "[entrypoint] Share: /backups"
+echo "[entrypoint] Config: ${CONF_OUT}"
+
+# Exec rsync in foreground; logs go to stdout per template
+exec rsync --daemon --no-detach --config="$CONF_OUT" --verbose
