@@ -6,6 +6,7 @@ ARG REPO_URL="https://github.com/warrenrees/rsyncd-backups"
 ARG TITLE="rsyncd-backups"
 ARG DESCRIPTION="Non-root rsyncd exposing /backups with env-based authentication."
 ARG LICENSE="MIT"
+ARG VERSION="dev"
 
 LABEL org.opencontainers.image.title="${TITLE}" \
       org.opencontainers.image.description="${DESCRIPTION}" \
