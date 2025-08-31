@@ -27,20 +27,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: warrenrees/rsyncd-backups
-          tags: |
-            type=ref,event=tag           # v0.2.2 -> 0.2.2 (only full semver)
-            type=raw,value=latest        # also push :latest
-          labels: |
-            org.opencontainers.image.title=rsyncd-backups
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-
-      - name: Compute build arg VERSION
-        id: buildargs
+      - name: Get version from tag
+        id: get_version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
       - name: Build and push multi-arch image
@@ -50,10 +38,11 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            warrenrees/rsyncd-backups:${{ steps.get_version.outputs.VERSION }}
+            warrenrees/rsyncd-backups:latest
           build-args: |
-            VERSION=${{ steps.buildargs.outputs.VERSION }}
+            VERSION=${{ steps.get_version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
