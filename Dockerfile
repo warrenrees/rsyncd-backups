@@ -5,7 +5,7 @@ FROM alpine:latest
 ARG REPO_URL="https://github.com/warrenrees/rsyncd-backups"
 ARG TITLE="rsyncd-backups"
 ARG DESCRIPTION="Non-root rsyncd exposing /backups with env-based authentication."
-ARG VERSION="0.1.5"
+ARG VERSION="0.2.1"
 ARG LICENSE="MIT"
 
 LABEL org.opencontainers.image.title="${TITLE}" \
